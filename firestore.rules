@@ -1,0 +1,50 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function signedIn() { return request.auth != null; }
+    function uid() { return request.auth.uid; }
+    function sessionDoc(sessionId) {
+      return get(/databases/$(db)/documents/sessions/$(sessionId)).data;
+    }
+    function isSessionStaff(sessionId) {
+      return sessionDoc(sessionId).teacherUid == uid() || sessionDoc(sessionId).ownerUid == uid();
+    }
+
+    match /classes/{classId} {
+      allow read: if signedIn() && (resource.data.ownerUid == uid() || resource.data.teacherUid == uid());
+      allow write: if false;
+      match /enrollments/{studentUid} {
+        allow read: if signedIn() && (studentUid == uid() ||
+          get(/databases/$(db)/documents/classes/$(classId)).data.ownerUid == uid());
+        allow write: if false;
+      }
+    }
+
+    match /sessions/{sessionId} {
+      allow read: if signedIn() && (resource.data.teacherUid == uid() || resource.data.ownerUid == uid());
+      allow write: if false;
+      match /checkins/{studentUid} {
+        allow read: if signedIn() && (studentUid == uid() || isSessionStaff(sessionId));
+        allow write: if false;
+      }
+      match /counters/{shard} {
+        allow read: if signedIn() && isSessionStaff(sessionId);
+        allow write: if false;
+      }
+      // challenges: delivered by push only; no client access
+    }
+
+    // Push token only. Not attendance data.
+    match /fcmTokens/{userId} {
+      allow create, update: if signedIn() && userId == uid()
+        && request.resource.data.keys().hasOnly(['token'])
+        && request.resource.data.token is string
+        && request.resource.data.token.size() <= 4096;
+      allow read, delete: if false;
+    }
+
+    // sessionSecrets, shortIds, activeSessions, bindings, deviceOwners, rateLimits
+    // and everything else: default deny.
+    match /{document=**} { allow read, write: if false; }
+  }
+}

@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Attendance Backend Test Console</title>
+<style>
+  :root {
+    --bg: #0f1117; --panel: #171a22; --panel2: #1e222c; --border: #2a2f3a;
+    --text: #e6e9ef; --muted: #9aa3b2; --accent: #5b8def; --ok: #34c38f;
+    --err: #f0616d; --warn: #e0a23a; --teacher: #5b8def; --student: #34c38f; --owner: #e0a23a;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  header { padding: 16px 22px 0; border-bottom: 1px solid var(--border);
+    background: rgba(15,17,23,.94); position: sticky; top: 0; z-index: 5; }
+  .top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  h1 { font-size: 17px; margin: 0; }
+  .sub { color: var(--muted); font-size: 12.5px; }
+  .grow { flex: 1; }
+  button { background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 12px; cursor: pointer; font-size: 13px; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.ghost { background: transparent; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .tabs { display: flex; gap: 6px; margin: 12px 0 0; }
+  .tab { border: 1px solid transparent; border-bottom: none; border-radius: 10px 10px 0 0;
+    padding: 9px 16px; background: transparent; color: var(--muted); font-weight: 600; }
+  .tab.active { background: var(--panel); border-color: var(--border); color: var(--text); }
+  .tab[data-tab="teacher"].active { border-top: 2px solid var(--teacher); }
+  .tab[data-tab="student"].active { border-top: 2px solid var(--student); }
+  .tab[data-tab="owner"].active { border-top: 2px solid var(--owner); }
+  main { padding: 0 22px 40px; }
+  .panel { display: none; grid-template-columns: minmax(0,1.3fr) minmax(0,1fr); gap: 16px; padding-top: 16px; }
+  .panel.active { display: grid; }
+  @media (max-width: 1000px) { .panel.active { grid-template-columns: 1fr; } }
+  section { display: flex; flex-direction: column; gap: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+  .card h2 { font-size: 13px; margin: 0 0 10px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  .fn .head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .name { font-family: var(--mono); font-size: 13px; color: #cfe0ff; }
+  .tag { font-size: 10.5px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
+  .tag.callable { color: #bcd3ff; border-color: #2f4b86; }
+  .tag.task { color: var(--warn); border-color: #6b5124; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  label { display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; color: var(--muted); flex: 1 1 120px; min-width: 0; }
+  input, select { background: var(--bg); border: 1px solid var(--border); border-radius: 7px;
+    color: var(--text); padding: 7px 9px; font-family: var(--mono); font-size: 12px; width: 100%; min-width: 0; }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .beacon { font-family: var(--mono); font-size: 22px; letter-spacing: .12em; color: #9fe8c8;
+    background: var(--bg); border: 1px dashed #2f6b52; border-radius: 10px; padding: 12px; text-align: center; }
+  .beacon.idle { color: var(--muted); border-color: var(--border); font-size: 13px; letter-spacing: 0; }
+  .stats { display: flex; gap: 10px; flex-wrap: wrap; }
+  .stat { background: var(--panel2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 8px 12px; min-width: 80px; }
+  .stat b { display: block; font-size: 20px; }
+  .stat span { font-size: 11px; color: var(--muted); }
+  .log { font-family: var(--mono); font-size: 12px; max-height: 300px; overflow: auto;
+    display: flex; flex-direction: column; gap: 6px; }
+  .log .entry { border-left: 3px solid var(--border); padding: 6px 9px; background: var(--panel2); border-radius: 0 7px 7px 0; }
+  .log .entry.ok { border-left-color: var(--ok); }
+  .log .entry.err { border-left-color: var(--err); }
+  .log .entry.info { border-left-color: var(--accent); }
+  .log .t { color: var(--muted); }
+  .log code { color: #cfe0ff; }
+  table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 11.5px; }
+  th, td { text-align: left; padding: 5px 7px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; }
+  .pill { display: inline-block; background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 1px 6px; margin: 0 4px 4px 0; }
+  .muted { color: var(--muted); }
+  .empty { color: var(--muted); font-size: 12.5px; }
+  .note { color: var(--muted); font-size: 12px; margin-top: 8px; }
+  .status-present { color: var(--ok); } .status-pending { color: var(--warn); }
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <h1>Attendance Backend Test Console</h1>
+    <span class="sub">teacher · student · owner — real Cloud Functions, in-memory Firestore</span>
+    <span class="grow"></span>
+    <button id="seed" class="ghost">Seed demo data</button>
+    <button id="reset" class="ghost">Reset</button>
+    <span id="status" class="tag">connecting…</span>
+  </div>
+  <div class="tabs">
+    <button class="tab active" data-tab="teacher">Teacher</button>
+    <button class="tab" data-tab="student">Student</button>
+    <button class="tab" data-tab="owner">Owner</button>
+  </div>
+</header>
+
+<main>
+  <!-- ============================= TEACHER ============================= -->
+  <div class="panel active" id="panel-teacher">
+    <section>
+      <div class="card fn">
+        <div class="head"><span class="name">startSession / endSession</span><span class="tag callable">callable</span></div>
+        <div class="row">
+          <label>Actor uid<input id="t-actor" value="teacher-1"></label>
+          <label>classId<input id="t-class" value="class-1"></label>
+          <label>durationMin<input id="t-duration" value="45"></label>
+          <label>mode<input id="t-mode" value="passive"></label>
+          <label>minSightings<input id="t-sightings" value="3"></label>
+          <label>minDwellMs<input id="t-dwell" value="3000"></label>
+        </div>
+        <div class="actions">
+          <button id="t-start" class="primary">Start session</button>
+          <button id="t-end">End session</button>
+          <button id="t-probe">Send presence probe</button>
+          <button id="t-close">Run closeSessionTask</button>
+        </div>
+        <div class="note">The teacher's device broadcasts the rotating code over BLE; the student panel reads it only when in range.</div>
+      </div>
+
+      <div class="card">
+        <h2>BLE beacon (broadcast)</h2>
+        <div id="beacon" class="beacon idle">No active session — start one above.</div>
+        <div id="beacon-meta" class="note"></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="card">
+        <h2>Live attendance <span class="muted" id="att-for"></span></h2>
+        <div class="stats">
+          <div class="stat"><b id="att-present">0</b><span>present</span></div>
+          <div class="stat"><b id="att-pending">0</b><span>pending</span></div>
+          <div class="stat"><b id="att-flagged">0</b><span>flagged</span></div>
+          <div class="stat"><b id="att-enrolled">0</b><span>enrolled</span></div>
+        </div>
+        <div class="note">present = confirmed by BLE dwell · pending = seen, not yet confirmed · flagged = missed a probe</div>
+      </div>
+      <div class="card">
+        <h2>Activity log</h2>
+        <div class="log" id="log"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============================= STUDENT ============================= -->
+  <div class="panel" id="panel-student">
+    <section>
+      <div class="card">
+        <h2>My phone</h2>
+        <div class="row">
+          <label>Actor uid<input id="s-actor" value="student-1"></label>
+          <label>deviceId<input id="s-device" value="device-abc-123456"></label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>BLE scanning</h2>
+        <div class="row">
+          <label>Distance to teacher
+            <select id="s-distance">
+              <option value="-50">Next to the teacher (−50 dBm)</option>
+              <option value="-70" selected>In the room (−70 dBm)</option>
+              <option value="-82">At the door (−82 dBm, weak)</option>
+              <option value="">Outside / no signal</option>
+            </select>
+          </label>
+        </div>
+        <div class="actions">
+          <label style="flex-direction:row;align-items:center;gap:8px;flex:0 0 auto">
+            <input type="checkbox" id="s-auto" style="width:auto" checked> auto-report while beacon detected
+          </label>
+          <button id="s-scan">Scan once &amp; report</button>
+        </div>
+        <div class="note" id="s-detected"></div>
+        <div class="note" id="s-last"></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="card">
+        <h2>My attendance status</h2>
+        <div id="s-status"><span class="empty">No session yet.</span></div>
+        <div class="note">Attendance is only granted when the phone detects the beacon in range long enough to confirm presence — nothing is tapped.</div>
+      </div>
+      <div class="card">
+        <h2>Activity log</h2>
+        <div class="log" id="log2"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============================== OWNER ============================== -->
+  <div class="panel" id="panel-owner">
+    <section>
+      <div class="card">
+        <h2>Statistics</h2>
+        <div class="row">
+          <label>Actor uid<input id="o-actor" value="owner-1"></label>
+          <label>classId<input id="o-class" value="class-1"></label>
+        </div>
+        <div class="actions">
+          <button id="o-refresh" class="primary">Refresh statistics</button>
+        </div>
+        <div id="o-summary" class="stats" style="margin-top:12px">
+          <div class="stat"><b id="o-sessions">–</b><span>sessions</span></div>
+          <div class="stat"><b id="o-enrolled">–</b><span>students</span></div>
+          <div class="stat"><b id="o-rate">–</b><span>present rate</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Per-student attendance</h2>
+        <div id="o-students"><span class="empty">Run “Refresh statistics”.</span></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="card">
+        <h2>Sessions</h2>
+        <div id="o-sessions-list"><span class="empty">Run “Refresh statistics”.</span></div>
+      </div>
+      <div class="card">
+        <h2>Device management</h2>
+        <div class="row">
+          <label>classId<input id="own-class" value="class-1"></label>
+          <label>studentUid<input id="own-student" value="student-1"></label>
+        </div>
+        <div class="actions"><button id="own-reset">Run approveDeviceReset</button></div>
+      </div>
+      <div class="card">
+        <h2>Activity log</h2>
+        <div class="log" id="log3"></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const v = (id) => document.getElementById(id).value;
+let st = { docs: [], pushes: [], queued: [], beacon: null };
+let ownerStats = null;
+const ctx = { sessionId: '', shortId: '', secret: '' };
+
+function log(cls, title, detail, box = '#log') {
+  const el = document.createElement('div');
+  el.className = 'entry ' + cls;
+  el.innerHTML = `<span class="t">${new Date().toLocaleTimeString()}</span> &nbsp;<code>${esc(title)}</code>` +
+    (detail ? `<div class="muted">${esc(detail)}</div>` : '');
+  const target = $(box);
+  target.prepend(el);
+  if (target.children.length > 60) target.lastChild.remove();
+  if (box !== '#log') log(cls, title, detail, '#log');
+}
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+
+async function api(pathname, body) {
+  const res = await fetch(pathname, {
+    method: body === undefined ? 'GET' : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  return res.json();
+}
+async function invoke(fn, actorUid, data) {
+  const res = await api('/api/invoke', { fn, actorUid: actorUid || null, data: data || {} });
+  if (res.state) { st = res.state; render(); }
+  return res;
+}
+const docOf = (path) => st.docs.find((d) => d.path === path);
+
+// ---- tabs
+document.querySelectorAll('.tab').forEach((tab) => {
+  tab.onclick = () => {
+    document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t === tab));
+    document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('active', p.id === `panel-${tab.dataset.tab}`));
+  };
+});
+
+// ---- attendance derived from the shared documents (mirrors server counts)
+function countsFor(sessionId, classId) {
+  const rows = st.docs.filter((d) => d.path.startsWith(`sessions/${sessionId}/checkins/`)).map((d) => d.data);
+  const present = rows.filter((r) => r.status === undefined || r.status === 'present').length;
+  const pending = rows.filter((r) => r.status === 'pending').length;
+  const flagged = rows.filter((r) => {
+    if (r.status === 'pending') return false;
+    const passed = new Set(r.passedChallenges || []);
+    return (r.dueChallenges || []).some((id) => !passed.has(id));
+  }).length;
+  const enrolled = classId
+    ? st.docs.filter((d) => d.path.startsWith(`classes/${classId}/enrollments/`)).length : 0;
+  return { present, pending, flagged, enrolled };
+}
+
+function render() {
+  renderBeacon();
+  renderStudent();
+}
+
+function renderBeacon() {
+  const b = st.beacon;
+  if (!b) {
+    $('#beacon').className = 'beacon idle';
+    $('#beacon').textContent = 'No active session — start one above.';
+    $('#beacon-meta').textContent = '';
+    $('#att-for').textContent = '';
+    for (const id of ['att-present', 'att-pending', 'att-flagged', 'att-enrolled']) $(`#${id}`).textContent = '0';
+    ctx.sessionId = '';
+    return;
+  }
+  $('#beacon').className = 'beacon';
+  $('#beacon').textContent = b.token;
+  $('#beacon-meta').innerHTML =
+    `<span class="pill">shortId ${esc(b.shortId)}</span><span class="pill">mode ${esc(b.mode || '-')}</span>` +
+    `<span class="pill">classId ${esc(b.classId)}</span><span class="pill">rotates every ${b.slotSeconds}s</span>`;
+  ctx.sessionId = b.sessionId; ctx.shortId = b.shortId;
+  const c = countsFor(b.sessionId, b.classId);
+  $('#att-present').textContent = c.present;
+  $('#att-pending').textContent = c.pending;
+  $('#att-flagged').textContent = c.flagged;
+  $('#att-enrolled').textContent = c.enrolled;
+  $('#att-for').textContent = `session ${b.sessionId}`;
+}
+
+function renderStudent() {
+  const b = st.beacon;
+  const actor = v('s-actor');
+  const raw = v('s-distance');
+  const rssi = raw === '' ? null : Number(raw);
+  // The phone can decode any advertisement it hears; a weak reading is still
+  // forwarded and the backend decides whether it counts as in-room.
+  $('#s-detected').innerHTML = (b && rssi !== null)
+    ? `beacon detected: shortId ${esc(b.shortId)} · token ${esc(b.token)} · rssi ${rssi} dBm`
+    : '<span class="empty">beacon not detected (no signal or no session)</span>';
+
+  const ci = (b && docOf(`sessions/${b.sessionId}/checkins/${actor}`)) || null;
+  if (!ci) {
+    $('#s-status').innerHTML = '<span class="empty">Not seen in this session.</span>';
+    return;
+  }
+  const d = ci.data;
+  const cls = d.status === 'present' ? 'status-present' : d.status === 'pending' ? 'status-pending' : '';
+  $('#s-status').innerHTML =
+    `<div class="pill">status: <span class="${cls}">${esc(d.status || 'present')}</span></div>` +
+    `<div class="pill">sightings: ${esc(d.sightings ?? 1)}</div>` +
+    `<div class="pill">bestRssi: ${esc(d.bestRssi ?? d.rssi ?? '–')} dBm</div>` +
+    `<div class="pill">deviceHash: ${esc(String(d.deviceHash || '').slice(0, 10))}…</div>` +
+    (d.passedChallenges && d.passedChallenges.length ? `<div class="pill">passed: ${esc(d.passedChallenges.join(','))}</div>` : '');
+}
+
+// ---- teacher actions
+$('#t-start').onclick = async () => {
+  const res = await invoke('startSession', v('t-actor'), {
+    classId: v('t-class'), durationMin: Number(v('t-duration')), mode: v('t-mode'),
+    presence: { minSightings: Number(v('t-sightings')), minDwellMs: Number(v('t-dwell')) },
+  });
+  if (res.ok) log('ok', `startSession → shortId=${res.result.shortId} (${v('t-mode')})`);
+  else log('err', `startSession ✗ ${res.error.code}`, res.error.message);
+};
+$('#t-end').onclick = async () => {
+  if (!ctx.sessionId) return log('err', 'endSession', 'no active session');
+  const res = await invoke('endSession', v('t-actor'), { sessionId: ctx.sessionId });
+  log(res.ok ? 'ok' : 'err', 'endSession', res.ok ? 'session closed' : `${res.error.code}: ${res.error.message}`);
+};
+$('#t-probe').onclick = async () => {
+  if (!ctx.sessionId) return log('err', 'issueChallengeTask', 'no active session');
+  const res = await invoke('issueChallengeTask', null, { sessionId: ctx.sessionId, challengeId: `c${Date.now()}` });
+  log(res.ok ? 'ok' : 'err', 'issueChallengeTask', res.ok ? 'presence probe pushed' : res.error.message);
+};
+$('#t-close').onclick = async () => {
+  if (!ctx.sessionId) return log('err', 'closeSessionTask', 'no active session');
+  const res = await invoke('closeSessionTask', null, { sessionId: ctx.sessionId });
+  log(res.ok ? 'ok' : 'err', 'closeSessionTask', res.ok ? 'closed + summary written' : res.error.message);
+};
+
+// ---- student actions
+async function studentReport(manual) {
+  const b = st.beacon;
+  if (!b) return manual && log('err', 'reportPresence', 'no active session', '#log2');
+  const raw = v('s-distance');
+  if (raw === '') {
+    $('#s-last').innerHTML = '<span class="empty">no signal — the phone hears no beacon, so nothing is reported</span>';
+    return manual && log('info', 'scan', 'no beacon signal — nothing reported', '#log2');
+  }
+  const res = await invoke('reportPresence', v('s-actor'), {
+    shortId: b.shortId, token: b.token, deviceId: v('s-device'), rssi: Number(raw),
+  });
+  if (res.ok) {
+    $('#s-last').innerHTML = `reported rssi ${raw} dBm → <b>${esc(res.result.status)}</b> (sightings ${res.result.sightings})`;
+    if (manual) log('ok', `reportPresence(${res.result.status})`, `rssi ${raw}, sightings ${res.result.sightings}`, '#log2');
+  } else {
+    $('#s-last').innerHTML = `<span class="status-pending">rejected: ${esc(res.error.code)} — ${esc(res.error.message)}</span>`;
+    if (manual) log('err', `reportPresence ✗ ${res.error.code}`, res.error.message, '#log2');
+  }
+}
+$('#s-scan').onclick = () => studentReport(true);
+
+// ---- owner actions
+async function loadStats() {
+  const res = await invoke('classStats', v('o-actor'), { classId: v('o-class') });
+  if (!res.ok) { ownerStats = null; return log('err', `classStats ✗ ${res.error.code}`, res.error.message, '#log3'); }
+  ownerStats = res.result;
+  renderOwner();
+  log('ok', 'classStats', `sessions ${ownerStats.totals.sessions}, rate ${(ownerStats.totals.presentRate * 100).toFixed(0)}%`, '#log3');
+}
+function renderOwner() {
+  const s = ownerStats;
+  $('#o-sessions').textContent = s.totals.sessions;
+  $('#o-enrolled').textContent = s.totals.enrolled;
+  $('#o-rate').textContent = `${(s.totals.presentRate * 100).toFixed(0)}%`;
+
+  $('#o-students').innerHTML = s.students.length ? `<table><thead><tr>
+      <th>student</th><th>attended</th><th>sessions</th><th>rate</th><th>flagged</th></tr></thead><tbody>` +
+    s.students.map((x) => `<tr><td>${esc(x.uid)}</td><td>${x.attended}</td><td>${x.sessions}</td>
+      <td>${x.sessions ? ((x.attended / x.sessions) * 100).toFixed(0) : 0}%</td><td>${x.flagged}</td></tr>`).join('') +
+    '</tbody></table>' : '<span class="empty">no students enrolled</span>';
+
+  $('#o-sessions-list').innerHTML = s.sessions.length ? `<table><thead><tr>
+      <th>session</th><th>status</th><th>present</th><th>pending</th><th>flagged</th><th>started</th></tr></thead><tbody>` +
+    s.sessions.map((x) => `<tr><td>${esc(x.sessionId)}</td><td>${esc(x.status)}</td><td>${x.present}</td>
+      <td>${x.pending}</td><td>${x.flagged}</td><td>${new Date(x.startAtMs).toLocaleTimeString()}</td></tr>`).join('') +
+    '</tbody></table>' : '<span class="empty">no sessions yet</span>';
+}
+$('#o-refresh').onclick = loadStats;
+$('#own-reset').onclick = async () => {
+  const res = await invoke('approveDeviceReset', v('o-actor'), { classId: v('own-class'), studentUid: v('own-student') });
+  log(res.ok ? 'ok' : 'err', 'approveDeviceReset', res.ok ? 'device binding cleared' : res.error.message, '#log3');
+};
+
+// ---- global
+async function seed() {
+  const res = await api('/api/seed', {});
+  st = res.state; render();
+  log('info', 'seeded demo data', 'class-1 · owner-1 / teacher-1 · student-1, student-2');
+}
+async function reset() {
+  const res = await api('/api/reset', {});
+  st = res.state; ownerStats = null; render();
+  $('#beacon-meta').textContent = '';
+  log('info', 'reset', 'in-memory store cleared');
+}
+$('#seed').onclick = seed;
+$('#reset').onclick = reset;
+
+async function poll() {
+  try {
+    const res = await api('/api/state');
+    if (res.state) { st = res.state; render(); }
+    $('#status').textContent = 'connected';
+    $('#status').style.color = 'var(--ok)';
+  } catch (e) {
+    $('#status').textContent = 'offline';
+    $('#status').style.color = 'var(--err)';
+  }
+}
+
+// student phone passively re-scans and reports while it sees the beacon
+setInterval(() => { if ($('#s-auto').checked) studentReport(false); }, 2000);
+setInterval(poll, 2000);
+poll();
+seed();
+</script>
+</body>
+</html>
